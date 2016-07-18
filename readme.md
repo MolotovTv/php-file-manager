@@ -2,5 +2,5 @@
 
 Install the latest version with
 
-    $ composer require asticode/php-file-manager
-    
+    $ composer require molotov/php-file-manager
+
