@@ -61,7 +61,11 @@ class PHPHandler extends AbstractHandler
 
     public function createDir($sPath)
     {
-        $bSuccess = mkdir($sPath);
+        if (is_dir($sPath)) {
+            return;
+        }
+
+        $bSuccess = mkdir($sPath, 0750, true);
 
         if (!$bSuccess) {
             throw new RuntimeException(sprintf(
