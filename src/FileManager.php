@@ -1,6 +1,9 @@
 <?php
 namespace Asticode\FileManager;
 
+use Asticode\FileManager\Entity\FileMethod;
+use Asticode\FileManager\Entity\Vertex;
+use Asticode\FileManager\Enum\Datasource;
 use Asticode\Toolbox\ExtendedArray;
 use Asticode\Toolbox\ExtendedString;
 use Asticode\FileManager\Enum\OrderDirection;
@@ -17,6 +20,7 @@ class FileManager
     private $aHandlers;
     private $sDefaultHandlerName;
     private $aCopyMethods;
+    private $aMoveMethods;
 
     // Construct
     public function __construct(array $aConfig, $sNamespace = 'Asticode\\FileManager\\Handler')
@@ -27,6 +31,7 @@ class FileManager
         $this->aHandlers = [];
         $this->sDefaultHandlerName = '';
         $this->aCopyMethods = [];
+        $this->aMoveMethods = [];
     }
 
     public function addHandler($sHandlerName, $sClassName, array $aConfig, $bDefaultHandler = false, $sNamespace = '')
@@ -56,8 +61,9 @@ class FileManager
             $this->sDefaultHandlerName = $sHandlerName;
         }
 
-        // Add copy methods
+        // Add file methods
         $this->aCopyMethods = array_merge($this->aCopyMethods, $oHandler->getCopyMethods());
+        $this->aMoveMethods = array_merge($this->aMoveMethods, $oHandler->getMoveMethods());
     }
 
     public function setDefaultHandlerName($sHandlerName)
@@ -231,6 +237,36 @@ class FileManager
         $oHandler->delete($sPath);
     }
 
+    private function executeFileMethods($sSourcePath, $sTargetPath, array $aFileMethods)
+    {
+        // Loop through copy methods
+        /** @var FileMethod $oFileMethod1 */
+        /** @var FileMethod $oFileMethod2 */
+        list($oFileMethod1, $oFileMethod2) = $aFileMethods;
+        if (count($aFileMethods) === 1) {
+            // Only one method, everything should be fine
+            call_user_func_array($oFileMethod1->getCallable(), [$sSourcePath, $sTargetPath]);
+            return;
+        } elseif (count($aFileMethods) === 2) {
+            // Two methods here
+            // If middle method is not local, problems will arise :(
+            if ($oFileMethod1->getTargetDatasource() === Datasource::LOCAL) {
+                $sTempPath = tempnam(sys_get_temp_dir(), "file_manager_");
+                call_user_func_array($oFileMethod1->getCallable(), [$sSourcePath, $sTempPath]);
+                call_user_func_array($oFileMethod2->getCallable(), [$sTempPath, $sTargetPath]);
+                unlink($sTempPath);
+            }
+        }
+
+        // Throw an error by default
+        throw new RuntimeException(sprintf(
+            "Couldn't execute file methods from %s to %s using %d file methods",
+            $sSourcePath,
+            $sTargetPath,
+            count($aFileMethods)
+        ));
+    }
+
     public function copy($sSourcePath, $sTargetPath)
     {
         // Parse paths
@@ -242,7 +278,7 @@ class FileManager
         $oTargetHandler = $this->getHandler($sTargetHandlerName);
 
         // Choose best copy methods
-        $aCopyMethods = $this->chooseBestCopyMethods($oSourceHandler, $oTargetHandler);
+        $aCopyMethods = $this->chooseBestFileMethods($oSourceHandler, $oTargetHandler, $this->aCopyMethods);
 
         // No copy method has been found
         if ($aCopyMethods === []) {
@@ -253,37 +289,111 @@ class FileManager
             ));
         }
 
-        // Loop through copy methods
-        /** @var $oCopyMethod \Asticode\FileManager\Entity\CopyMethod */
-        foreach ($aCopyMethods as $oCopyMethod) {
-            call_user_func_array($oCopyMethod->getCallable(), [$sSourcePath, $sTargetPath]);
-        }
+        // Execute copy methods
+        $this->executeFileMethods($sSourcePath, $sTargetPath, $aCopyMethods);
     }
 
     public function move($sSourcePath, $sTargetPath)
     {
-        // Copy
-        $this->copy($sSourcePath, $sTargetPath);
+        // Parse paths
+        /** @var $oSourceHandler \Asticode\FileManager\Handler\HandlerInterface */
+        list ($sSourceHandlerName, $sSourcePath) = $this->parsePath($sSourcePath);
+        $oSourceHandler = $this->getHandler($sSourceHandlerName);
+        /** @var $oTargetHandler \Asticode\FileManager\Handler\HandlerInterface */
+        list ($sTargetHandlerName, $sTargetPath) = $this->parsePath($sTargetPath);
+        $oTargetHandler = $this->getHandler($sTargetHandlerName);
 
-        // Delete
-        $this->delete($sSourcePath);
+        // Choose best move methods
+        $aMoveMethods = $this->chooseBestFileMethods($oSourceHandler, $oTargetHandler, $this->aMoveMethods);
+
+        // Move methods have been found
+        if ($aMoveMethods !== []) {
+            // Execute copy methods
+            $this->executeFileMethods($sSourcePath, $sTargetPath, $aMoveMethods);
+        } else {
+            // Copy
+            $this->copy($sSourcePath, $sTargetPath);
+
+            // Delete
+            $this->delete($sSourcePath);
+        }
     }
 
-    private function chooseBestCopyMethods(HandlerInterface $oSourceHandler, HandlerInterface $oTargetHandler)
-    {
-        // Initialize
-        $aCopyMethods = [];
+    public function chooseBestFileMethods(
+        HandlerInterface $oSourceHandler,
+        HandlerInterface $oTargetHandler,
+        array $aMethods
+    ) {
+        // Get start vertex
+        $oVertexStart = new Vertex($oSourceHandler->getDatasource());
+        $oVertexStart->setVisited(true);
+        $oVertexStart->setDistance(0);
 
-        // Loop through file handler copy methods
-        /** @var $oCopyMethod \Asticode\FileManager\Entity\CopyMethod */
-        foreach ($this->aCopyMethods as $oCopyMethod) {
+        // Clone copy methods
+        /** @var FileMethod $oCopyMethod */
+        $aCopyMethods = [];
+        foreach ($aMethods as $oCopyMethod) {
+            // Clone
+            $aCopyMethods[] = clone $oCopyMethod;
+
+            // Check whether this copy method is sufficient
             if ($oCopyMethod->getSourceDatasource() === $oSourceHandler->getDatasource()
-                and $oCopyMethod->getTargetDatasource() === $oTargetHandler->getDatasource()) {
-                $aCopyMethods = [$oCopyMethod];
+                && $oCopyMethod->getTargetDatasource() === $oTargetHandler->getDatasource()) {
+                return [$oCopyMethod];
+            }
+        }
+
+        // Compute paths
+        $aQueue = [$oVertexStart];
+        $aVertexes = [];
+        while ($aQueue) {
+            // Get last vertex from the queue
+            /** @var Vertex $oLastVertexFromQueue */
+            $oLastVertexFromQueue = array_pop($aQueue);
+
+            // Find appropriate copy methods
+            foreach ($aCopyMethods as $oCopyMethod) {
+                // Copy method is appropriate
+                if ($oCopyMethod->getSourceDatasource() === $oLastVertexFromQueue->getDatasource()) {
+                    // Loop through copy method vertexes
+                    while ($oCopyMethod->getDoublyLinkedList()->valid()) {
+                        /** @var Vertex $oCurrentVertex */
+                        $oCurrentVertex = $oCopyMethod->getDoublyLinkedList()->current();
+                        if (!$oCurrentVertex->isVisited()) {
+                            $oCurrentVertex->setVisited(true);
+                            $oVertex = clone $oCurrentVertex;
+                            $oVertex->setDistance($oLastVertexFromQueue->getDistance() + 1);
+                            $aPath = $oLastVertexFromQueue->getPath();
+                            array_push($aPath, $oCopyMethod);
+                            $oVertex->setPath($aPath);
+                            array_push($aQueue, $oVertex);
+                            array_push($aVertexes, $oVertex);
+                        }
+                        $oCopyMethod->getDoublyLinkedList()->next();
+                    }
+                }
+            }
+        }
+
+        // Look for shortest path
+        $oShortestPath = [];
+        $iMinPathDistance = -1;
+        /** @var Vertex $oVertex */
+        foreach ($aVertexes as $oVertex) {
+            /** @var FileMethod $oFirstCopyMethod */
+            $oFirstCopyMethod = $oVertex->getPath()[0];
+            /** @var FileMethod $oLastCopyMethod */
+            $oLastCopyMethod = $oVertex->getPath()[count($oVertex->getPath()) - 1];
+
+            // Valid path
+            if ($oFirstCopyMethod->getSourceDatasource() === $oSourceHandler->getDatasource()
+                && $oLastCopyMethod->getTargetDatasource() === $oTargetHandler->getDatasource()
+                && ($iMinPathDistance === -1 || $iMinPathDistance > $oVertex->getDistance())) {
+                $oShortestPath = $oVertex->getPath();
             }
         }
 
         // Return
-        return $aCopyMethods;
+        return $oShortestPath;
     }
 }
