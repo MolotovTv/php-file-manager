@@ -34,11 +34,12 @@ class Toolbox
 
     public static function removeExtension($sPath)
     {
-        $aExplodedPath = explode('.', $sPath);
-        if (count($aExplodedPath) > 1) {
-            array_pop($aExplodedPath);
+        $matches = [];
+        $match = preg_match('/^(.*)\.[\w\d]+$/i', $sPath, $matches);
+        if ($match !== false) {
+            return $matches[1];
         }
-        return implode('.', $aExplodedPath);
+        return $sPath;
     }
 
     public static function getPathWithoutExtension($sPath)
@@ -60,11 +61,24 @@ class Toolbox
     public static function parseRawList($sRawList, $sPath)
     {
         // Explode raw list
-        list($sRights, $iNumber, $sUser, $sGroup, $iSize, $sDateItem1, $sDateItem2, $sDateItem3, $sName) = array_pad(
-            preg_split('/\s+/', $sRawList),
-            9,
-            ''
+        $matches = array();
+        $match = preg_match(
+            '/^(?P<rights>[\w\-]+)\s+(?P<inumber>\d+)\s+(?P<user>[\w\d]+)\s+(?P<group>[\w\d]+)\s+(?P<size>\d+)\s+(?P<month>[\d\w]+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+)\s+(?P<file>.*)$/i',
+            $sRawList,
+            $matches
         );
+        if ($match === false) {
+            throw new RuntimeException(sprintf(
+                'Cannot parse line %s',
+                $sRawList
+            ));
+        }
+
+        $iSize = $matches['size'];
+        $sDateItem1 = $matches['month'];
+        $sDateItem2 = $matches['day'];
+        $sDateItem3 = $matches['time'];
+        $sName = $matches['file'];
 
         // Get modification date as a string
         $sModificationDate = sprintf(
@@ -79,6 +93,10 @@ class Toolbox
         foreach (self::DATE_FORMATS as $sDateFormat) {
             $oModificationDate = \DateTime::createFromFormat($sDateFormat, $sModificationDate);
             if ($oModificationDate) {
+                // Remove 1 year if the modification year is in the future
+                if ($oModificationDate->getTimestamp() > date_create()->getTimestamp()) {
+                    $oModificationDate->sub(new \DateInterval('P1Y'));
+                }
                 break;
             }
         }
