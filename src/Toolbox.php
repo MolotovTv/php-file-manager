@@ -36,7 +36,7 @@ class Toolbox
     {
         $matches = [];
         $match = preg_match('/^(.*)\.[\w\d]+$/i', $sPath, $matches);
-        if ($match !== false) {
+        if ($match === 1) {
             return $matches[1];
         }
         return $sPath;
