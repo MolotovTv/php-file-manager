@@ -63,7 +63,7 @@ class Toolbox
         // Explode raw list
         $matches = array();
         $match = preg_match(
-            '/^(?P<rights>[\w\-]+)\s+(?P<inumber>\d+)\s+(?P<user>[\w\d]+)\s+(?P<group>[\w\d]+)\s+(?P<size>\d+)\s+(?P<month>[\d\w]+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+)\s+(?P<file>.*)$/i',
+            '/^(?P<rights>[\w\-]+)\s+(?P<inumber>\d+)\s+(?P<user>[\w\d]+)\s+(?P<group>[\w\d]+)\s+(?P<size>\d+)\s+(?P<month>[\d\w]+)\s+(?P<day>\d+)\s+((?P<time>\d+:\d+)|(?P<year>\d{4}))\s+(?P<file>.*)$/i',
             $sRawList,
             $matches
         );
@@ -77,7 +77,12 @@ class Toolbox
         $iSize = $matches['size'];
         $sDateItem1 = $matches['month'];
         $sDateItem2 = $matches['day'];
-        $sDateItem3 = $matches['time'];
+        if (array_key_exists('time', $matches) && !empty($matches['time'])) {
+            $sDateItem3 = $matches['time'];
+        }
+        else if (array_key_exists('year', $matches) && !empty($matches['year'])){
+            $sDateItem3 = $matches['year'];
+        }
         $sName = $matches['file'];
 
         // Get modification date as a string
