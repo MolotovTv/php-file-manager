@@ -338,4 +338,21 @@ class FTPHandler extends AbstractHandler
         );
     }
 
+    public function deleteDir($sPath)
+    {
+        // Get CURL
+        $oCurl = $this->curlInit();
+
+        // Execute CURL
+        $this->curlExec(
+            $oCurl,
+            '',
+            ObjectType::DIRECTORY,
+            '',
+            [
+                sprintf('DELE %s', $sPath),
+            ]
+        );
+    }
+
 }

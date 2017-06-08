@@ -237,6 +237,17 @@ class FileManager
         $oHandler->delete($sPath);
     }
 
+    public function deleteDir($sPath)
+    {
+        // Parse path
+        /** @var $oHandler \Asticode\FileManager\Handler\HandlerInterface */
+        list ($sHandlerName, $sPath) = $this->parsePath($sPath);
+        $oHandler = $this->getHandler($sHandlerName);
+
+        // Execute
+        $oHandler->deleteDir($sPath);
+    }
+
     private function executeFileMethods($sSourcePath, $sTargetPath, array $aFileMethods)
     {
         // Loop through copy methods

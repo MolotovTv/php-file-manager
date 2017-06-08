@@ -198,6 +198,15 @@ class UNIXHandler extends AbstractHandler
         ));
     }
 
+    public function deleteDir($sPath)
+    {
+        // Execute
+        $this->exec(sprintf(
+            'rm -rf \'%s\'',
+            $this->escapeSingleQuotes($sPath)
+        ));
+    }
+
     public function copy($sSourcePath, $sTargetPath)
     {
         // Execute

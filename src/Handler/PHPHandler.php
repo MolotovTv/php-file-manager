@@ -193,6 +193,24 @@ class PHPHandler extends AbstractHandler
         }
     }
 
+    public function deleteDir($sPath)
+    {
+        // Check if dir exists
+        if (!is_dir($sPath)) {
+            return;
+        }
+
+        // Create dir
+        $bSuccess = rmdir($sPath);
+
+        if (!$bSuccess) {
+            throw new RuntimeException(sprintf(
+                'Error while deleting directory %s',
+                $sPath
+            ));
+        }
+    }
+
     public function copy($sSourcePath, $sTargetPath)
     {
         // Execute
