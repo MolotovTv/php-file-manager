@@ -108,12 +108,16 @@ class Toolbox
 
         // Modification date is valid
         if (!$oModificationDate) {
-            throw new RuntimeException(sprintf(
-                'Raw modification date <%s> is not any of the following formats <%s> for raw list <%s>',
-                $sModificationDate,
-                implode(',', self::DATE_FORMATS),
-                $sRawList
-            ));
+            try {
+                $oModificationDate = new \DateTime($sModificationDate);
+            } catch (\Exception $exc) {
+                throw new RuntimeException(sprintf(
+                    'Raw modification date <%s> is not any of the following formats <%s> for raw list <%s>',
+                    $sModificationDate,
+                    implode(',', self::DATE_FORMATS),
+                    $sRawList
+                ));
+            }
         }
 
         // Return
