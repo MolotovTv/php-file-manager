@@ -195,12 +195,25 @@ class PHPHandler extends AbstractHandler
 
     public function deleteDir($sPath)
     {
-        // Check if dir exists
-        if (!is_dir($sPath)) {
-            return;
+        if (!file_exists($sPath)) {
+            return true;
         }
 
-        // Create dir
+        if (!is_dir($sPath)) {
+            return unlink($sPath);
+        }
+
+        foreach (scandir($sPath) as $item) {
+            if ($item == '.' || $item == '..') {
+                continue;
+            }
+
+            if (!$this->deleteDir($sPath . DIRECTORY_SEPARATOR . $item)) {
+                return false;
+            }
+
+        }
+        
         $bSuccess = rmdir($sPath);
 
         if (!$bSuccess) {
@@ -209,6 +222,8 @@ class PHPHandler extends AbstractHandler
                 $sPath
             ));
         }
+
+        return $bSuccess;
     }
 
     public function copy($sSourcePath, $sTargetPath)
