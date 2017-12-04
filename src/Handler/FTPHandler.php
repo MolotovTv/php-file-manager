@@ -11,6 +11,7 @@ use Asticode\FileManager\Enum\OrderField;
 use Asticode\FileManager\Enum\WriteMethod;
 use Exception;
 use RuntimeException;
+use Asticode\FileManager\Exception\Handler\FTPHandlerException;
 
 class FTPHandler extends AbstractHandler
 {
@@ -287,8 +288,11 @@ class FTPHandler extends AbstractHandler
             // Close file
             fclose($oFile);
 
-            // Throw
-            throw $oException;
+            if(23 === (int) curl_errno($oCurl)){
+                throw new FTPHandlerException(sprintf("Fail to write on destination : %s (Full disk ?)", $sTargetPath), FTPHandlerException::FAIL_WRITE_FILE);
+            } else {
+                throw $oException;
+            }
         }
 
         // Close file
