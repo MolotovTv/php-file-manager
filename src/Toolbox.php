@@ -120,13 +120,10 @@ class Toolbox
             }
         }
 
-        // Return
+        $sFilePath = str_replace('//', '/', sprintf('%s/%s', $sPath, $sName));
+
         return new File(
-            sprintf(
-                '%s/%s',
-                $sPath,
-                $sName
-            ),
+            $sFilePath,
             $iSize,
             $oModificationDate
         );
