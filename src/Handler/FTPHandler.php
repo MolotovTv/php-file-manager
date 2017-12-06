@@ -63,9 +63,7 @@ class FTPHandler extends AbstractHandler
         return $oCurl;
     }
 
-    private function curlExec(
-    $oCurl, $sPath, $iObjectTypeId = ObjectType::FILE, $sCustomRequest = '', $aPostCommands = []
-    )
+    private function curlExec($oCurl, $sPath, $iObjectTypeId = ObjectType::FILE, $sCustomRequest = '', $aPostCommands = [])
     {
         // Set URL
         $sUrl = $this->getFullPath($sPath, $iObjectTypeId);
@@ -86,9 +84,8 @@ class FTPHandler extends AbstractHandler
 
         // Failure
         if (curl_errno($oCurl) > 0) {
-            throw new RuntimeException(sprintf(
-                    'Error while executing "%s" on %s with curl error #%s and curl error message "%s"', $sCustomRequest === '' ? implode('","', $aPostCommands) : $sCustomRequest, $sUrl, curl_errno($oCurl), curl_error($oCurl)
-            ));
+            $sMessage = FTPHandlerException::getMessageByError(curl_errno($oCurl), $sUrl, ($sCustomRequest === '' ? implode('","', $aPostCommands) : $sCustomRequest));
+            throw new FTPHandlerException($sMessage, 1000 + curl_errno($oCurl));
         }
 
         // Return
@@ -162,12 +159,7 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
-        try {
-            $sResponse = $this->curlExec($oCurl, $sPath, ObjectType::DIRECTORY, 'LIST -a');
-        } catch (Exception $oException) {
-            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sPath]);
-        }
-
+        $sResponse = $this->curlExec($oCurl, $sPath, ObjectType::DIRECTORY, 'LIST -a');
 
         // Get files
         $aList = explode("\n", $sResponse);
@@ -240,16 +232,12 @@ class FTPHandler extends AbstractHandler
         $oCurl = $this->curlInit();
 
         // Execute CURL
-        try {
-            $this->curlExec(
-                    $oCurl, '', ObjectType::FILE, '', [
-                sprintf('RNFR %s', $sSourcePath),
-                sprintf('RNTO %s', $sTargetPath),
-                    ]
-            );
-        } catch (Exception $oException) {
-            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sTargetPath]);
-        }
+        $this->curlExec(
+                $oCurl, '', ObjectType::FILE, '', [
+            sprintf('RNFR %s', $sSourcePath),
+            sprintf('RNTO %s', $sTargetPath),
+                ]
+        );
     }
 
     public function download($sSourcePath, $sTargetPath)
@@ -265,10 +253,8 @@ class FTPHandler extends AbstractHandler
         try {
             $this->curlExec($oCurl, $sSourcePath);
         } catch (Exception $oException) {
-            // Close file
             fclose($oFile);
-
-            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sTargetPath]);
+            throw $oException;
         }
 
         // Close file
@@ -290,10 +276,7 @@ class FTPHandler extends AbstractHandler
         try {
             $this->curlExec($oCurl, $sTargetPath);
         } catch (Exception $oException) {
-            // Close file
             fclose($oFile);
-
-            // Throw
             throw $oException;
         }
 
@@ -319,23 +302,11 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
-        // Execute CURL
         $this->curlExec(
                 $oCurl, '', ObjectType::DIRECTORY, '', [
             sprintf('DELE %s', $sPath),
                 ]
         );
-    }
-
-    private function handleCurlError(Exception $oException, int $iCurlCode = 0, array $aParam = [])
-    {
-        if (CURLE_FTP_ACCESS_DENIED === (int) $iCurlCode) {
-            throw new FTPHandlerException(sprintf("Access denied for this resource : %s (Folder exist ?)", $sTargetPath), FTPHandlerException::ACCES_DENIED);
-        } else if (CURLE_WRITE_ERROR === (int) $iCurlCode) {
-            throw new FTPHandlerException(sprintf("Fail to write on destination : %s (Full disk ?)", $aParam[FTPHandlerException::E_DESTINATION]), FTPHandlerException::FAIL_WRITE_FILE);
-        } else {
-            throw $oException;
-        }
     }
 
 }
