@@ -1,4 +1,5 @@
 <?php
+
 namespace Asticode\FileManager\Handler;
 
 use Asticode\FileManager\Enum\ObjectType;
@@ -15,6 +16,7 @@ use Asticode\FileManager\Exception\Handler\FTPHandlerException;
 
 class FTPHandler extends AbstractHandler
 {
+
     // Attributes
     private $aConfig;
 
@@ -26,20 +28,18 @@ class FTPHandler extends AbstractHandler
 
         // Default values
         $this->aConfig = ExtendedArray::extendWithDefaultValues(
-            $this->aConfig,
-            [
-                'port' => 21,
-                'proxy' => '',
-                'timeout' => 90,
-            ]
+                        $this->aConfig, [
+                    'port'    => 21,
+                    'proxy'   => '',
+                    'timeout' => 90,
+                        ]
         );
 
         // Check config required attributes
         ExtendedArray::checkRequiredKeys(
-            $this->aConfig,
-            [
-                'host',
-            ]
+                $this->aConfig, [
+            'host',
+                ]
         );
     }
 
@@ -55,9 +55,7 @@ class FTPHandler extends AbstractHandler
         // Add user and password
         if (isset($this->aConfig['username']) and isset($this->aConfig['password'])) {
             curl_setopt($oCurl, CURLOPT_USERPWD, sprintf(
-                '%s:%s',
-                $this->aConfig['username'],
-                $this->aConfig['password']
+                            '%s:%s', $this->aConfig['username'], $this->aConfig['password']
             ));
         }
 
@@ -66,12 +64,9 @@ class FTPHandler extends AbstractHandler
     }
 
     private function curlExec(
-        $oCurl,
-        $sPath,
-        $iObjectTypeId = ObjectType::FILE,
-        $sCustomRequest = '',
-        $aPostCommands = []
-    ) {
+    $oCurl, $sPath, $iObjectTypeId = ObjectType::FILE, $sCustomRequest = '', $aPostCommands = []
+    )
+    {
         // Set URL
         $sUrl = $this->getFullPath($sPath, $iObjectTypeId);
         curl_setopt($oCurl, CURLOPT_URL, $sUrl);
@@ -92,11 +87,7 @@ class FTPHandler extends AbstractHandler
         // Failure
         if (curl_errno($oCurl) > 0) {
             throw new RuntimeException(sprintf(
-                'Error while executing "%s" on %s with curl error #%s and curl error message "%s"',
-                $sCustomRequest === '' ? implode('","', $aPostCommands) : $sCustomRequest,
-                $sUrl,
-                curl_errno($oCurl),
-                curl_error($oCurl)
+                    'Error while executing "%s" on %s with curl error #%s and curl error message "%s"', $sCustomRequest === '' ? implode('","', $aPostCommands) : $sCustomRequest, $sUrl, curl_errno($oCurl), curl_error($oCurl)
             ));
         }
 
@@ -108,9 +99,7 @@ class FTPHandler extends AbstractHandler
     {
         // Build path
         $sPath = sprintf(
-            'ftp://%s%s',
-            $this->aConfig['host'],
-            $sPath
+                'ftp://%s%s', $this->aConfig['host'], $sPath
         );
 
         // Add trailing slash
@@ -131,14 +120,10 @@ class FTPHandler extends AbstractHandler
     {
         return [
             new FileMethod(
-                Datasource::FTP,
-                Datasource::LOCAL,
-                [$this, 'download']
+                    Datasource::FTP, Datasource::LOCAL, [$this, 'download']
             ),
             new FileMethod(
-                Datasource::LOCAL,
-                Datasource::FTP,
-                [$this, 'upload']
+                    Datasource::LOCAL, Datasource::FTP, [$this, 'upload']
             ),
         ];
     }
@@ -147,9 +132,7 @@ class FTPHandler extends AbstractHandler
     {
         return [
             new FileMethod(
-                Datasource::FTP,
-                Datasource::FTP,
-                [$this, 'rename']
+                    Datasource::FTP, Datasource::FTP, [$this, 'rename']
             ),
         ];
     }
@@ -158,36 +141,33 @@ class FTPHandler extends AbstractHandler
     {
         // Get files
         $aFiles = $this->searchPattern(sprintf(
-            '/^%s$/',
-            basename($sPath)
-        ), dirname($sPath));
+                        '/^%s$/', basename($sPath)
+                ), dirname($sPath));
 
         // Path exists
         if ($aFiles !== []) {
             return $aFiles[0];
         } else {
             throw new RuntimeException(sprintf(
-                'Path %s doesn\'t exist',
-                $sPath
+                    'Path %s doesn\'t exist', $sPath
             ));
         }
     }
 
-    public function explore(
-        $sPath,
-        $iOrderField = OrderField::NONE,
-        $iOrderDirection = OrderDirection::ASC,
-        array $aAllowedExtensions = [],
-        array $aAllowedBasenamePatterns = []
-    ) {
+    public function explore($sPath, $iOrderField = OrderField::NONE, $iOrderDirection = OrderDirection::ASC, array $aAllowedExtensions = [], array $aAllowedBasenamePatterns = [])
+    {
         // Initialize
         $aFiles = [];
 
         // Get CURL
         $oCurl = $this->curlInit();
 
-        // Execute CURL
-        $sResponse = $this->curlExec($oCurl, $sPath, ObjectType::DIRECTORY, 'LIST -a');
+        try {
+            $sResponse = $this->curlExec($oCurl, $sPath, ObjectType::DIRECTORY, 'LIST -a');
+        } catch (Exception $oException) {
+            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sPath]);
+        }
+
 
         // Get files
         $aList = explode("\n", $sResponse);
@@ -260,16 +240,16 @@ class FTPHandler extends AbstractHandler
         $oCurl = $this->curlInit();
 
         // Execute CURL
-        $this->curlExec(
-            $oCurl,
-            '',
-            ObjectType::FILE,
-            '',
-            [
+        try {
+            $this->curlExec(
+                    $oCurl, '', ObjectType::FILE, '', [
                 sprintf('RNFR %s', $sSourcePath),
                 sprintf('RNTO %s', $sTargetPath),
-            ]
-        );
+                    ]
+            );
+        } catch (Exception $oException) {
+            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sTargetPath]);
+        }
     }
 
     public function download($sSourcePath, $sTargetPath)
@@ -288,11 +268,7 @@ class FTPHandler extends AbstractHandler
             // Close file
             fclose($oFile);
 
-            if(23 === (int) curl_errno($oCurl)){
-                throw new FTPHandlerException(sprintf("Fail to write on destination : %s (Full disk ?)", $sTargetPath), FTPHandlerException::FAIL_WRITE_FILE);
-            } else {
-                throw $oException;
-            }
+            $this->handleCurlError($oException, (int) curl_errno($oCurl), [FTPHandlerException => $sTargetPath]);
         }
 
         // Close file
@@ -332,13 +308,9 @@ class FTPHandler extends AbstractHandler
 
         // Execute CURL
         $this->curlExec(
-            $oCurl,
-            '',
-            ObjectType::FILE,
-            '',
-            [
-                sprintf('DELE %s', $sPath),
-            ]
+                $oCurl, '', ObjectType::FILE, '', [
+            sprintf('DELE %s', $sPath),
+                ]
         );
     }
 
@@ -349,14 +321,21 @@ class FTPHandler extends AbstractHandler
 
         // Execute CURL
         $this->curlExec(
-            $oCurl,
-            '',
-            ObjectType::DIRECTORY,
-            '',
-            [
-                sprintf('DELE %s', $sPath),
-            ]
+                $oCurl, '', ObjectType::DIRECTORY, '', [
+            sprintf('DELE %s', $sPath),
+                ]
         );
+    }
+
+    private function handleCurlError(Exception $oException, int $iCurlCode = 0, array $aParam = [])
+    {
+        if (CURLE_FTP_ACCESS_DENIED === (int) $iCurlCode) {
+            throw new FTPHandlerException(sprintf("Access denied for this resource : %s (Folder exist ?)", $sTargetPath), FTPHandlerException::ACCES_DENIED);
+        } else if (CURLE_WRITE_ERROR === (int) $iCurlCode) {
+            throw new FTPHandlerException(sprintf("Fail to write on destination : %s (Full disk ?)", $aParam[FTPHandlerException::E_DESTINATION]), FTPHandlerException::FAIL_WRITE_FILE);
+        } else {
+            throw $oException;
+        }
     }
 
 }

@@ -10,6 +10,9 @@ use Exception;
 class FileManagerException extends Exception
 {
 
-    const FAIL_WRITE_FILE = 100;
-    
+    const E_SOURCE        = 'param-source';
+    const E_DESTINATION   = 'param-destination';
+    const ACCES_DENIED    = 1009;
+    const FAIL_WRITE_FILE = 1023;
+
 }
