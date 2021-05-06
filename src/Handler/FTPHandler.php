@@ -32,7 +32,8 @@ class FTPHandler extends AbstractHandler
                 'port' => 21,
                 'proxy' => '',
                 'timeout' => 90,
-                'sftp' => false
+                'sftp' => false,
+                'root_path' => '/~/'
             ]
         );
 
@@ -105,7 +106,7 @@ class FTPHandler extends AbstractHandler
             '%sftp://%s%s%s',
             $this->aConfig['sftp'] ? 's' : null,
             $this->aConfig['host'],
-            $this->aConfig['sftp'] ? '/~' : null,
+            $this->aConfig['sftp'] ? $this->aConfig['root_path'] : null,
             $sPath
         );
 
@@ -115,6 +116,18 @@ class FTPHandler extends AbstractHandler
         }
 
         // Return
+        return $sPath;
+    }
+
+    /**
+     * Return the correct file/directory path for SFTP connection
+     * @param $sPath
+     */
+    private function getSFTPPath($sPath) {
+        if ($this->aConfig['sftp']) {
+            return $this->aConfig['root_path'] . $sPath;
+        }
+
         return $sPath;
     }
 
@@ -197,9 +210,19 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
-        // Execute CURL
-        curl_setopt($oCurl, CURLOPT_FTP_CREATE_MISSING_DIRS, true);
-        $this->curlExec($oCurl, $sPath, ObjectType::DIRECTORY);
+        $aCommands = [
+            sprintf('MKD %s', $sPath),
+        ];
+
+        if ($this->aConfig['sftp']) {
+            $aCommands = [
+                sprintf('MKDIR %s', $this->getSFTPPath($sPath))
+            ];
+        }
+
+        $this->curlExec(
+            $oCurl, '', ObjectType::DIRECTORY, '', $aCommands
+        );
     }
 
     public function createFile($sPath)
@@ -241,12 +264,23 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
+        $aCommands = [
+            sprintf('RNFR %s', $sSourcePath),
+            sprintf('RNTO %s', $sTargetPath),
+        ];
+
+        if ($this->aConfig['sftp']) {
+            $aCommands = [
+                sprintf('RENAME %s  %s',
+                    $this->getSFTPPath($sSourcePath),
+                    $this->getSFTPPath($sTargetPath)
+                )
+            ];
+        }
+
         // Execute CURL
         $this->curlExec(
-            $oCurl, '', ObjectType::FILE, '', [
-                sprintf('RNFR %s', $sSourcePath),
-                sprintf('RNTO %s', $sTargetPath),
-            ]
+            $oCurl, '', ObjectType::FILE, '', $aCommands
         );
     }
 
@@ -299,11 +333,19 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
+        $aCommands = [
+            sprintf('DELE %s', $sPath),
+        ];
+
+        if ($this->aConfig['sftp']) {
+            $aCommands = [
+                sprintf('RM %s', $this->getSFTPPath($sPath))
+            ];
+        }
+
         // Execute CURL
         $this->curlExec(
-            $oCurl, '', ObjectType::FILE, '', [
-                sprintf('DELE %s', $sPath),
-            ]
+            $oCurl, '', ObjectType::FILE, '', $aCommands
         );
     }
 
@@ -312,10 +354,18 @@ class FTPHandler extends AbstractHandler
         // Get CURL
         $oCurl = $this->curlInit();
 
+        $aCommands = [
+            sprintf('DELE %s', $sPath),
+        ];
+
+        if ($this->aConfig['sftp']) {
+            $aCommands = [
+                sprintf('RMDIR %s', $this->getSFTPPath($sPath))
+            ];
+        }
+
         $this->curlExec(
-            $oCurl, '', ObjectType::DIRECTORY, '', [
-                sprintf('DELE %s', $sPath),
-            ]
+            $oCurl, '', ObjectType::DIRECTORY, '', $aCommands
         );
     }
 
