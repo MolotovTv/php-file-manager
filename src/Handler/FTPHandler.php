@@ -33,7 +33,7 @@ class FTPHandler extends AbstractHandler
                 'proxy' => '',
                 'timeout' => 90,
                 'sftp' => false,
-                'root_path' => '/~'
+                'root_path' => '/~/'
             ]
         );
 
