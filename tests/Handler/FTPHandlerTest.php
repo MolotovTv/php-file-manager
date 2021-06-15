@@ -48,6 +48,24 @@ class FTPHandlerTest extends PHPUnit_Framework_TestCase
         $this->assertTrue($this->oFTPHandler->read($this->sTmpFolder . $this->sTmpFile) == $this->sTestContent);
     }
 
+    public function testSizeOfFile() {
+        $size = $this->oFTPHandler->size($this->sTmpFolder . $this->sTmpFile);
+
+        $this->assertTrue($size == 29);
+    }
+
+    public function testFileExists() {
+        $exists = $this->oFTPHandler->exists($this->sTmpFolder . $this->sTmpFile);
+
+        $this->assertTrue($exists == true);
+    }
+
+    public function testFileNotExists() {
+        $exists = $this->oFTPHandler->exists($this->sTmpFolder . $this->sTmpFile . '_old');
+
+        $this->assertTrue($exists == false);
+    }
+
     public function testRenameFile() {
         $this->oFTPHandler->rename($this->sTmpFolder . $this->sTmpFile, $this->sTmpFolder . $this->sTmpFile . '.processed');
 
