@@ -369,4 +369,26 @@ class FTPHandler extends AbstractHandler
         );
     }
 
+    public function size($sPath)
+    {
+        // Get CURL
+        $oCurl = $this->curlInit();
+
+        curl_setopt($oCurl, CURLOPT_HEADER, true);
+        curl_setopt($oCurl, CURLOPT_NOBODY, true);
+
+        $this->curlExec($oCurl, $sPath);
+
+        return curl_getinfo($oCurl, CURLINFO_CONTENT_LENGTH_DOWNLOAD);;
+    }
+
+    public function exists($sPath)
+    {
+        try {
+            $this->size($sPath);
+            return true;
+        } catch (\Throwable $t) {
+            return false;
+        }
+    }
 }
