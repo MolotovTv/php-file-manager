@@ -387,7 +387,7 @@ class FTPHandler extends AbstractHandler
         try {
             $this->size($sPath);
             return true;
-        } catch (FTPHandlerException $e) {
+        } catch (\Throwable $t) {
             return false;
         }
     }
